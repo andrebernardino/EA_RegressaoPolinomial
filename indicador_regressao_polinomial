@@ -1,0 +1,283 @@
+//
+// Regression Channel with variable polynomial degree indicator
+//
+// original by Boris
+// www.iticsoftware.com
+// http://www.mql5.com/en/code/8417
+//
+// V1.1 by graziani:
+// -> minor changes for MT4 b600 compatibility
+//
+
+#property copyright "© 2008 BJF Trading Group"
+#property link      "www.iticsoftware.com"
+
+#property strict
+
+#property indicator_chart_window
+#property indicator_buffers 3
+#property indicator_color1 LimeGreen
+#property indicator_color2 Gold
+#property indicator_color3 Gold
+
+
+input int degree=3;
+input double kstd=2.0;
+input int bars=250;//numero de barras que o usuário qquer que seja calculado
+input int shift=0;
+
+//-----
+double fx[],sqh[],sql[];//variáveis arrays nas quais serão plotados os 3 gráficos: Função de x, sqh(gráfico de cima), sql(gráfico de baixo)
+
+double ai[10,10],b[10],x[10],sx[20];
+double sum;
+int ip,p,n,f;
+double qq,laco_pivo,tt;
+int ii,jj,kk,pivo,nn;
+double sq;
+
+int i0=0;
+//+------------------------------------------------------------------+
+//|                                                                  |
+//+------------------------------------------------------------------+
+/*  
+ para k = 1,...,n−1 faça  
+ |Pivoteamento: 
+ |pivo = akk 
+ |l_pivo = k 
+ |para i = (k + 1),...,n faça 
+ ||se |aik| > |pivo| então 
+ |||pivo = aik 
+ |||l_pivo = i 
+ ||fim 
+ |fim 
+ |se pivo = 0 então 
+ ||Parar. A matriz A é singular. 
+ |fim 
+ |se l_pivo != k então 
+ ||para j = 1,...,n faça 
+ |||troca = akj 
+ |||akj = al_pivoj 
+ |||al_pivoj = troca 
+ ||fim 
+ ||troca = bk 
+ ||bk = bl_pivo 
+ ||bl_pivo = troca 
+ |fim 
+ |Eliminação: 
+ |para i = (k + 1),...,n faça 
+ ||m = aik/akk 
+ ||aik = 0 
+ ||para j = (k + 1),...,n faça 
+ |||aij = aij −makj 
+ ||fim 
+ ||bi = bi −mbk 
+ |fim 
+ fim
+*/
+
+
+
+int init()
+  {
+   SetIndexBuffer(0,fx);//função de x
+   SetIndexBuffer(1,sqh);//raiz quadrada superior ou linha superior
+   SetIndexBuffer(2,sql);//raiz quadrada inferior ou linha inferior
+
+   SetIndexStyle(0,DRAW_LINE);//vai desenhar uma linha nas variáveis fx, sqh e sql
+   SetIndexStyle(1,DRAW_LINE);
+   SetIndexStyle(2,DRAW_LINE);
+
+   SetIndexEmptyValue(0, 0.0);
+   SetIndexEmptyValue(1, 0.0);
+   SetIndexEmptyValue(2, 0.0);
+
+   SetIndexShift(0,shift);
+   SetIndexShift(1,shift);
+   SetIndexShift(2,shift);
+
+   return(0);
+  }
+//+------------------------------------------------------------------+
+//| Custom indicator deinitialization function                       |
+//+------------------------------------------------------------------+
+int deinit()
+  {
+//clear();
+   return(0);
+  }
+int OnCalculate(const int rates_total,      // size of input time series 
+                 const int prev_calculated,  // bars handled in previous call 
+                 const datetime& time[],     // Time 
+                 const double& open[],       // Open 
+                 const double& high[],       // High 
+                 const double& low[],        // Low 
+                 const double& close[],      // Close 
+                 const long& tick_volume[],  // Tick Volume 
+                 const long& volume[],       // Real Volume 
+                 const int& spread[]         // Spread 
+   )
+   {
+   if(Bars < bars) return(-1);//Se o número de barras do gráfico for menor que o número de barras informado pelo usuário, o indicador não vai funcionar
+
+   int mi; // VAriável usada apenas no start
+   ip=bars;//bars é o numero de barras horizontais que o indicador vai percorrer plotando o gráfico
+   p=ip; // numero de barras que o usuário colocou como parametro: 250
+   sx[1]=p+1; //sx[1] = 251
+   nn=degree+1;//4
+
+   SetIndexDrawBegin(0,Bars-p-1);// começa a desenhar em (9445 - 251 - 1) = 9193
+   SetIndexDrawBegin(1,Bars-p-1);
+   SetIndexDrawBegin(2,Bars-p-1);
+
+//----------------------SOMATÓRIO DE X-------------------------------------------------------------------
+   //nn começa com 4*2-2 -> 6 --> de 1 a 6
+   for(mi=1;mi<=nn*2-2;mi++) // for laço de 1 até 6
+     {
+      sum=0;
+      for(n=i0;n<=i0+p;n++)//para n=0 até 250
+        {
+         sum+=MathPow(n,mi);//soma= soma + (n elevado a mi) 
+        }
+      sx[mi+1]=sum;//sx na posição[mi + 1] = soma
+     }
+//----------------------Sxy---------------------
+//Sxy => Somatório de x * y
+//mi começa com 1 e vai até 4
+   for(mi=1;mi<=nn;mi++)
+     {
+      sum=0.00000;
+      for(n=i0;n<=i0+p;n++)//para n=0 até 250
+        {
+         if(mi==1) sum+=Close[n];
+         else sum+=Close[n]*MathPow(n,mi-1);// Y * X^N Basicamente o resultado do fechamento vezes o x elevado a mi
+        }
+      b[mi]=sum;//guarda os somatórios num vetor de 4 colunas e 250 linhas
+     }
+//===============Matrix=======================================================================================================
+   //armazena em uma matriz ai[10][10]
+   //para jj de 1 até 4, faça o seguinte:   
+   for(jj=1;jj<=nn;jj++)
+   {
+      for(ii=1; ii<=nn; ii++)//para de ii de 1 até 4
+      {
+         kk=ii+jj-1;
+         //matriz ai[10,10] na posição ordenada no sentido da leitura humana
+         //recebe o valor de sx na posição: (ii + jj - 1)
+         ai[ii,jj]=sx[kk];
+         /*
+         ai[1,1]=sx[1]
+         ai[2,1]=sx[2]
+         ai[3,1]=sx[3]
+         ai[4,1]=sx[4]
+         
+         ai[1,2]=sx[2]
+         ai[2,2]=sx[3]
+         ai[3,2]=sx[4]
+         ai[4,2]=sx[5]
+                  
+         ai[1,3]=sx[3]
+         ai[2,3]=sx[4]
+         ai[3,3]=sx[5]
+         ai[4,3]=sx[6]
+         
+         ai[1,4]=sx[4]
+         ai[2,4]=sx[5]
+         ai[3,4]=sx[6]
+         ai[4,4]=sx[7]//0
+         
+         */
+      }
+ }
+   
+   
+   //==========(Eliminação Gaussiana com Pivoteamento)================
+   //para kk de 1 até 3, faça o seguinte
+   for(kk=1; kk<=nn-1; kk++)
+   {
+      pivo=0;
+      laco_pivo=0;
+      //para ii de 1 até 4 faça
+      for(ii=kk; ii<=nn; ii++)
+        {
+           if(MathAbs(ai[ii,kk])>laco_pivo)//é maior que zero??
+           {
+              laco_pivo=MathAbs(ai[ii,kk]);//laco_pivo recebe o valor
+              pivo=ii;//pivo recebe ii
+           }
+        }
+        if(pivo==0)
+        {
+            return(0);
+        }
+        if(pivo!=kk)//se pivo é diferente de kk
+        {
+            //para jj de 1 até 4 faça
+            for(jj=1; jj<=nn; jj++)
+            {
+                //troca as posições da matriz
+                tt=ai[kk,jj];
+                ai[kk,jj]=ai[pivo,jj];
+                ai[pivo,jj]=tt;
+            }
+            tt=b[kk];
+            b[kk]=b[pivo];//troca as posições do vetor b também
+            b[pivo]=tt;
+        }
+        //para todo ii de kk + 1 até 4, faça
+        for(ii=kk+1;ii<=nn;ii++)
+        {
+            qq=ai[ii,kk]/ai[kk,kk];
+            for(jj=1;jj<=nn;jj++)
+            {
+               if(jj==kk) 
+               {
+                    ai[ii,jj]=0;
+               }
+               else
+               {
+                 ai[ii,jj]=ai[ii,jj]-qq*ai[kk,jj];
+               }               
+           }
+           b[ii]=b[ii]-qq*b[kk];
+        }
+     }
+     x[nn]=b[nn]/ai[nn,nn];
+     for(ii=nn-1;ii>=1;ii--)
+     {
+        tt=0;
+        for(jj=1;jj<=nn-ii;jj++)
+        {
+           tt=tt+ai[ii,ii+jj]*x[ii+jj];
+           x[ii]=(1/ai[ii,ii])*(b[ii]-tt);
+        }
+     }
+     //===========================================================================================================================
+     //para n=0 até o numero de barras informado pelo usuário:250
+     for(n=i0;n<=i0+p;n++)
+     {
+        sum=0;
+        //para kk de 1 até 3
+        for(kk=1;kk<=degree;kk++)
+        {
+            sum+=x[kk+1]*MathPow(n,kk);//soma = soma + x[2..3] vezes n elevado a kk que é o degree informado pelo usuario
+        }
+        fx[n]=x[1]+sum;
+     }
+     //-----------------------------------Std-----------------------------------------------------------------------------------
+     //para n=0 até o numero de barras informado pelo usuário:250
+     sq=0.0;
+     for(n=i0;n<=i0+p;n++)
+     {
+        sq+=MathPow(Close[n]-fx[n],2);
+     }
+     sq=MathSqrt(sq/(p+1))*kstd;
+
+     for(n=i0;n<=i0+p;n++)
+     {
+        sqh[n]=fx[n]+sq;
+        sql[n]=fx[n]-sq;
+     }
+     return(1);
+ 
+}
