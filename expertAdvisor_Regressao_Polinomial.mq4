@@ -1,10 +1,10 @@
 // 
-/*
+/* customização
 Publicado em 14 de abr de 2016
 Hoy veremos en detalle cómo se usa el comando iCustom para convocar un dato de un indicador 
 personalizado en otro programa como un Expert Adviser, primero creo un indicador customizado 
 simple para luego usarlo en un Expert que compre o venda dependiendo del cierre vs un promedio móvil especial 
-(nuestro indicador customizado)
+(nuestro indicador customizado).
 Perdón por los errores de cambio de captura.
 Lea las advertencias de riesgo en http://ien4x.com y http://forexhispana.com
 */
@@ -51,11 +51,11 @@ void OnTick()
    {
       //se não há trades, buscar um
       //Comment("Valor do Indicador: -> ", valorDoIndicadorPersonalizado());
-      if(existeCondicoesDeCompra() == true)
+      if(existeCondicoesDeAbrirCompra() == true)
       {
          bool r = OrderSend(NULL,0,Lots, Ask, 20, 0, 0, "Expert Advisor Abre COMPRA", MagicNum, 0,clrAliceBlue);
       }
-      if(existeCondicoesDeVenda() == true)
+      if(existeCondicoesDeAbrirVenda() == true)
       {
         bool r = OrderSend(NULL,1,Lots, Bid, 20, 0, 0, "Expert Advisor Abre VENDA", MagicNum, 0, clrBlueViolet);
       }
@@ -65,15 +65,16 @@ void OnTick()
    {
       if(OrderSelect(ticketAOperar, SELECT_BY_TICKET, MODE_TRADES))
       {
-         //se é uma compra e necessito buscar uma venda
-         if(OrderType() == OP_BUY && existeCondicoesDeVenda() == true)
+         Comment("Tipo de ordem: ", OrderType());
+         //se o ticket é uma ordem de compra, então verifica se tem condições de fechar esta ordem
+         if(OrderType() == 0 && existeCondicoesDeFecharCompra() == true)
          {
-            bool r = OrderClose(ticketAOperar, OrderLots(), OrderClosePrice(), 20, clrNONE);
+            bool r = OrderClose(ticketAOperar, OrderLots(), OrderClosePrice(), 20, clrGreen);
          }
-         //se é uma venda e necessito buscar uma compra
-         if(OrderType() == OP_SELL && existeCondicoesDeCompra() == true)
+         //se o ticket é uma ordem de venda, então verifica se tem condições de fechar esta ordem de venda
+         if(OrderType() == 1 && existeCondicoesDeFecharVenda() == true)
          {
-           bool r = OrderClose(ticketAOperar, OrderLots(), OrderClosePrice(), 20, clrNONE);
+           bool r = OrderClose(ticketAOperar, OrderLots(), OrderClosePrice(), 20, clrBlue);
          }
       }
    }
@@ -83,7 +84,7 @@ int getTicketAOperar()
 {  
    for(int op = 0; op < OrdersTotal(); op++)
    {
-      bool r = OrderSelect(op,SELECT_BY_POS,MODE_TRADES);
+      bool r = OrderSelect(op, SELECT_BY_POS, MODE_TRADES);
       if(OrderMagicNumber() == MagicNum && OrderSymbol() == Symbol())
       {
          return OrderTicket();
@@ -93,49 +94,36 @@ int getTicketAOperar()
    return (-1);//não encontrou nada
 }
 
-bool existeCondicoesDeCompra()
+bool existeCondicoesDeAbrirCompra()
 {
-  //se tiver tudo subindo abre posição de compra
-   bool linhaCimaSubindo = valorIndicadorLinhaDeCima(0) > valorIndicadorLinhaDeCima(2);
-   bool linhaMeioSubindo = valorIndicadorLinhaDoMeio(0) > valorIndicadorLinhaDoMeio(2);
-   bool linhaDeBaixoSubindo = valorIndicadorLinhaDeBaixo(0) > valorIndicadorLinhaDeBaixo(2);
-   if(linhaCimaSubindo && linhaMeioSubindo && linhaDeBaixoSubindo){
-   return true;
-   }
-   else{
-     return false;
-   }
-   
-  /* if( Close[1] < valor)
-   {
-      return true;
-   }
-   else
-   {
-       return false;
-   }*/
+   bool temCondicoes =  (Low[0] < valorIndicadorLinhaDoMeio(0));
+   string condicoes = (temCondicoes == true)?"sim":"não";
+   Comment(StringFormat("Existe condições de ABRIR COMPRA: %s %s %s ", DoubleToString(Low[0],4), DoubleToString(valorIndicadorLinhaDeBaixo(0),4), condicoes));
+   return temCondicoes;
 }
 
-bool existeCondicoesDeVenda()
+bool existeCondicoesDeFecharCompra()
 {
-   double valor = valorIndicadorLinhaDeCima(0);
-   bool linhaCimaDescendo = valorIndicadorLinhaDeCima(0) < valorIndicadorLinhaDeCima(2);
-   bool linhaMeioDescendo = valorIndicadorLinhaDoMeio(0) < valorIndicadorLinhaDoMeio(2);
-   bool linhaDeBaixoDescendo = valorIndicadorLinhaDeBaixo(0) < valorIndicadorLinhaDeBaixo(2);
-   if(linhaCimaDescendo && linhaMeioDescendo && linhaDeBaixoDescendo){
-   return true;
-   }
-   else{
-     return false;
-   }
-   /*if( Close[1] >= valor)
-   {
-      return true;
-   }
-   else
-   {
-       return false;
-   }*/
+   bool temCondicoes =  (High[0] > valorIndicadorLinhaDoMeio(0));
+   string condicoes = (temCondicoes == true)?"sim":"não";
+   Comment(StringFormat("Existe condições de FECHAR COMPRA: %s %s %s ", DoubleToString(High[0],4), DoubleToString(valorIndicadorLinhaDoMeio(0),4),condicoes));
+   return temCondicoes;
+}
+
+bool existeCondicoesDeAbrirVenda()
+{   
+   bool temCondicoes =  (High[0] > valorIndicadorLinhaDoMeio(0));
+   string condicoes = (temCondicoes == true)?"sim":"não";
+   Comment(StringFormat("Existe condições de ABRIR VENDA: %s %s %s ", DoubleToString(High[0],4), DoubleToString(valorIndicadorLinhaDeCima(0),4),condicoes));
+   return temCondicoes;
+}
+
+bool existeCondicoesDeFecharVenda()
+{
+    bool temCondicoes = (High[0] < valorIndicadorLinhaDoMeio(0));
+    string condicoes = (temCondicoes == true)?"sim":"não";
+    Comment(StringFormat("Existe condições de FECHAR VENDA: %s %s %s ", DoubleToString(High[0],4), DoubleToString(valorIndicadorLinhaDoMeio(0),4),condicoes));
+    return temCondicoes;
 }
 
 double  valorIndicadorLinhaDoMeio(int qualCandleStick)
