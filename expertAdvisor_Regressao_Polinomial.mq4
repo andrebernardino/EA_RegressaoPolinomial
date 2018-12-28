@@ -53,11 +53,11 @@ void OnTick()
       //Comment("Valor do Indicador: -> ", valorDoIndicadorPersonalizado());
       if(existeCondicoesDeAbrirCompra() == true)
       {
-         bool r = OrderSend(NULL,0,Lots, Ask, 20, 0, 0, "Expert Advisor Abre COMPRA", MagicNum, 0,clrAliceBlue);
+         bool r = OrderSend(NULL,OP_BUY,Lots, Ask, 20, 0, 0, "Expert Advisor Abre COMPRA", MagicNum, 0,clrAliceBlue);
       }
       if(existeCondicoesDeAbrirVenda() == true)
       {
-        bool r = OrderSend(NULL,1,Lots, Bid, 20, 0, 0, "Expert Advisor Abre VENDA", MagicNum, 0, clrBlueViolet);
+        bool r = OrderSend(NULL,OP_SELL,Lots, Bid, 20, 0, 0, "Expert Advisor Abre VENDA", MagicNum, 0, clrBlueViolet);
       }
    }
    //Já tem um trade no ar, então monitorar a saída deste trade
@@ -67,12 +67,12 @@ void OnTick()
       {
          Comment("Tipo de ordem: ", OrderType());
          //se o ticket é uma ordem de compra, então verifica se tem condições de fechar esta ordem
-         if(OrderType() == 0 && existeCondicoesDeFecharCompra() == true)
+         if(OrderType() == OP_BUY && existeCondicoesDeFecharCompra() == true)
          {
             bool r = OrderClose(ticketAOperar, OrderLots(), OrderClosePrice(), 20, clrGreen);
          }
          //se o ticket é uma ordem de venda, então verifica se tem condições de fechar esta ordem de venda
-         if(OrderType() == 1 && existeCondicoesDeFecharVenda() == true)
+         else if(OrderType() == OP_SELL && existeCondicoesDeFecharVenda() == true)
          {
            bool r = OrderClose(ticketAOperar, OrderLots(), OrderClosePrice(), 20, clrBlue);
          }
@@ -96,58 +96,55 @@ int getTicketAOperar()
 
 bool existeCondicoesDeAbrirCompra()
 {
-   bool temCondicoes =  (Low[0] < valorIndicadorLinhaDoMeio(0));
-   string condicoes = (temCondicoes == true)?"sim":"não";
-   Comment(StringFormat("Existe condições de ABRIR COMPRA: %s %s %s ", DoubleToString(Low[0],4), DoubleToString(valorIndicadorLinhaDeBaixo(0),4), condicoes));
+   bool temCondicoes =  (Low[0] <= valorIndicadorLinhaDeBaixo(0));
+   string condicoes = (temCondicoes == true)? "sim" : "não";
+   Comment(StringFormat("Existe condições de ABRIR COMPRA: LOW[0]: %s IND BAIXO: %s %s ", DoubleToString(Low[0],4), DoubleToString(valorIndicadorLinhaDeBaixo(0),4), condicoes));
    return temCondicoes;
 }
 
 bool existeCondicoesDeFecharCompra()
 {
-   bool temCondicoes =  (High[0] > valorIndicadorLinhaDoMeio(0));
-   string condicoes = (temCondicoes == true)?"sim":"não";
-   Comment(StringFormat("Existe condições de FECHAR COMPRA: %s %s %s ", DoubleToString(High[0],4), DoubleToString(valorIndicadorLinhaDoMeio(0),4),condicoes));
+   bool temCondicoes =  (High[0] > valorIndicadorLinhaDeCima(0));
+   string condicoes = (temCondicoes == true)? "sim": "não";
+   Comment(StringFormat("Existe condições de FECHAR COMPRA: HIGH[0]: %s indicador linha acima: %s %s ", DoubleToString(High[0],4), DoubleToString(valorIndicadorLinhaDeCima(0),4),condicoes));
    return temCondicoes;
 }
 
 bool existeCondicoesDeAbrirVenda()
 {   
-   bool temCondicoes =  (High[0] > valorIndicadorLinhaDoMeio(0));
-   string condicoes = (temCondicoes == true)?"sim":"não";
-   Comment(StringFormat("Existe condições de ABRIR VENDA: %s %s %s ", DoubleToString(High[0],4), DoubleToString(valorIndicadorLinhaDeCima(0),4),condicoes));
+   bool temCondicoes =  (High[0] >= valorIndicadorLinhaDeCima(0));
+   string condicoes = (temCondicoes == true)? "sim" : "não";
+   Comment(StringFormat("Existe condições de ABRIR VENDA: HIGH[0]: %s indicador linha acima: %s %s ", DoubleToString(High[0],4), DoubleToString(valorIndicadorLinhaDeCima(0),4),condicoes));
    return temCondicoes;
 }
 
 bool existeCondicoesDeFecharVenda()
 {
-    bool temCondicoes = (High[0] < valorIndicadorLinhaDoMeio(0));
-    string condicoes = (temCondicoes == true)?"sim":"não";
-    Comment(StringFormat("Existe condições de FECHAR VENDA: %s %s %s ", DoubleToString(High[0],4), DoubleToString(valorIndicadorLinhaDoMeio(0),4),condicoes));
+    bool temCondicoes = (Low[0] <= valorIndicadorLinhaDeBaixo(0));
+    string condicoes = (temCondicoes == true)? "sim" : "não";
+    Comment(StringFormat("Existe condições de FECHAR VENDA: %s %s %s ", DoubleToString(Low[0],4), DoubleToString(valorIndicadorLinhaDeBaixo(0),4),condicoes));
     return temCondicoes;
 }
 
+/*SEÇÃO EXCLUSIVA DE CAPTURAR OS VALORES DO INDICADOR*/
 double  valorIndicadorLinhaDoMeio(int qualCandleStick)
 {
-   double R_Middle=iCustom(NULL,0,ind_name, 
+   double VALOR_Linha_Meio = iCustom(NULL,0,ind_name, 
                        Regr_Degree,Regr_Kstd,Regr_Bars,Regr_Shift, 
                        0,qualCandleStick); 
-   return R_Middle;
+   return VALOR_Linha_Meio;
 }
-
 double  valorIndicadorLinhaDeCima(int qualCandleStick)
 {   
-   double R_Upper=iCustom(NULL,0,ind_name, 
+   double VALOR_Linha_Cima = iCustom(NULL,0,ind_name, 
                        Regr_Degree,Regr_Kstd,Regr_Bars,Regr_Shift, 
                        1,qualCandleStick);
-   return R_Upper;
-}
-
-
-  
+   return VALOR_Linha_Cima;
+}  
 double  valorIndicadorLinhaDeBaixo(int qualCandleStick)
 {
-   double R_Low=iCustom(NULL,0,ind_name, 
+   double VALOR_Linha_Baixo =iCustom(NULL,0,ind_name, 
                        Regr_Degree,Regr_Kstd,Regr_Bars,Regr_Shift, 
                        2,qualCandleStick);
-   return R_Low;
+   return VALOR_Linha_Baixo;
 }
