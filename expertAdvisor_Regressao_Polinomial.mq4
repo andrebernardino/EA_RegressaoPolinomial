@@ -16,13 +16,14 @@ Lea las advertencias de riesgo en http://ien4x.com y http://forexhispana.com
 #property strict 
 
 
-extern double Lots=0.1; 
+extern double Lots=0.01; 
 
 
 extern int Regr_Degree=3; 
 extern double Regr_Kstd=1.0; 
 extern int Regr_Bars=250; 
 extern int Regr_Shift=0; 
+extern string parDeMoedas = "EURUSD";
 
 input int MagicNum = 123123; 
 string ind_name="..\\Indicators\\Regressão polinomial e linear\\indicador.ex4"; 
@@ -43,6 +44,7 @@ void deinit()
 //+------------------------------------------------------------------+ 
 //|                                                                  | 
 //+------------------------------------------------------------------+ 
+
 void OnTick()
 {
    //Buscar se ha operações abertas, se sím vamos procura fecha-las, senão vamos procurar abrir
@@ -51,18 +53,22 @@ void OnTick()
    {
       //se não há trades, buscar um
       //Comment("Valor do Indicador: -> ", valorDoIndicadorPersonalizado());
+      
       if(existeCondicoesDeAbrirCompra() == true)
       {
-         bool r = OrderSend(NULL,OP_BUY,Lots, Ask, 20, 0, 0, "Expert Advisor Abre COMPRA", MagicNum, 0,clrAliceBlue);
+         double takeprofit = valorIndicadorLinhaDoMeio(0);
+         bool r = OrderSend(parDeMoedas,OP_BUY,Lots, Ask, 20, 0, takeprofit, "Expert Advisor Abre COMPRA", MagicNum, 0,clrAliceBlue);
       }
-      if(existeCondicoesDeAbrirVenda() == true)
+      else if(existeCondicoesDeAbrirVenda() == true)
       {
-        bool r = OrderSend(NULL,OP_SELL,Lots, Bid, 20, 0, 0, "Expert Advisor Abre VENDA", MagicNum, 0, clrBlueViolet);
+        double takeprofit = valorIndicadorLinhaDoMeio(0);
+        bool r = OrderSend(parDeMoedas,OP_SELL,Lots, Bid, 20, 0, takeprofit, "Expert Advisor Abre VENDA", MagicNum, 0, clrBlueViolet);
       }
    }
    //Já tem um trade no ar, então monitorar a saída deste trade
    if(ticketAOperar > -1)
    {
+      
       if(OrderSelect(ticketAOperar, SELECT_BY_TICKET, MODE_TRADES))
       {
          Comment("Tipo de ordem: ", OrderType());
@@ -85,7 +91,7 @@ int getTicketAOperar()
    for(int op = 0; op < OrdersTotal(); op++)
    {
       bool r = OrderSelect(op, SELECT_BY_POS, MODE_TRADES);
-      if(OrderMagicNumber() == MagicNum && OrderSymbol() == Symbol())
+      if(OrderMagicNumber() == MagicNum)
       {
          return OrderTicket();
       }
@@ -94,9 +100,24 @@ int getTicketAOperar()
    return (-1);//não encontrou nada
 }
 
+bool existeUmaOrdemAberta(int tipoDeOrdem)
+{
+   bool retorno = false;
+   for(int op = 0; op < OrdersTotal(); op++)
+   {
+      bool r = OrderSelect(op, SELECT_BY_POS, MODE_TRADES);
+      if(OrderType() == tipoDeOrdem)
+      {
+      retorno = true;
+      continue;
+      }
+   }
+   return retorno;
+}
+
 bool existeCondicoesDeAbrirCompra()
 {
-   bool temCondicoes =  (Low[0] <= valorIndicadorLinhaDeBaixo(0));
+   bool temCondicoes =  !existeUmaOrdemAberta(OP_BUY) && (Low[0] <= valorIndicadorLinhaDeBaixo(0));
    string condicoes = (temCondicoes == true)? "sim" : "não";
    Comment(StringFormat("Existe condições de ABRIR COMPRA: LOW[0]: %s IND BAIXO: %s %s ", DoubleToString(Low[0],4), DoubleToString(valorIndicadorLinhaDeBaixo(0),4), condicoes));
    return temCondicoes;
@@ -104,7 +125,7 @@ bool existeCondicoesDeAbrirCompra()
 
 bool existeCondicoesDeFecharCompra()
 {
-   bool temCondicoes =  (High[0] > valorIndicadorLinhaDeCima(0));
+   bool temCondicoes = existeUmaOrdemAberta(OP_BUY) && (High[0] >= valorIndicadorLinhaDeCima(0));
    string condicoes = (temCondicoes == true)? "sim": "não";
    Comment(StringFormat("Existe condições de FECHAR COMPRA: HIGH[0]: %s indicador linha acima: %s %s ", DoubleToString(High[0],4), DoubleToString(valorIndicadorLinhaDeCima(0),4),condicoes));
    return temCondicoes;
@@ -112,7 +133,7 @@ bool existeCondicoesDeFecharCompra()
 
 bool existeCondicoesDeAbrirVenda()
 {   
-   bool temCondicoes =  (High[0] >= valorIndicadorLinhaDeCima(0));
+   bool temCondicoes = !existeUmaOrdemAberta(OP_SELL) &&(High[0] >= valorIndicadorLinhaDeCima(0));
    string condicoes = (temCondicoes == true)? "sim" : "não";
    Comment(StringFormat("Existe condições de ABRIR VENDA: HIGH[0]: %s indicador linha acima: %s %s ", DoubleToString(High[0],4), DoubleToString(valorIndicadorLinhaDeCima(0),4),condicoes));
    return temCondicoes;
@@ -120,7 +141,7 @@ bool existeCondicoesDeAbrirVenda()
 
 bool existeCondicoesDeFecharVenda()
 {
-    bool temCondicoes = (Low[0] <= valorIndicadorLinhaDeBaixo(0));
+    bool temCondicoes = existeUmaOrdemAberta(OP_SELL) && (Low[0] <= valorIndicadorLinhaDeBaixo(0));
     string condicoes = (temCondicoes == true)? "sim" : "não";
     Comment(StringFormat("Existe condições de FECHAR VENDA: %s %s %s ", DoubleToString(Low[0],4), DoubleToString(valorIndicadorLinhaDeBaixo(0),4),condicoes));
     return temCondicoes;
